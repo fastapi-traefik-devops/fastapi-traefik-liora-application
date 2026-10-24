@@ -9,9 +9,15 @@ Gates are defined once in `phase1.py`; the `Jenkinsfile` picks the profile:
 
 | Trigger | Profile | Publishes |
 | --- | --- | --- |
-| Pull request | `full`: all 18 gates plus `gitops` | no |
-| Nightly on main (`H 2 * * *`) | `full` | no |
-| New commit on main (SCM poll `H/2`) | `release`: artifact, security and image gates, then `attest` | yes |
+| Pull request | `pr`: **temporarily** `full` without `backend-integration` and `frontend-tests` | no |
+| Nightly on main (`H 2 * * *`) | `full`: all 18 gates plus `gitops` | no |
+| New commit on main (SCM poll `H/2`) | `release`: artifact, security and image gates, then `attest` | yes, to STAGE |
+| Manual job `dev-build` (`BRANCH` parameter, `Jenkinsfile.dev`) | `dev`: the `pr` gates plus `attest` | yes, to DEV |
+
+`dev-build` builds the real head commit of any branch, attests it like a release and asks
+`trusted/publish` (`ACTION=dev`) to publish the scanned images and commit them directly to the
+DEV overlay in infrastructure `main`; Argo CD deploys. DEV is never superseded and has no
+acceptance. The `pr` profile is a temporary speed-up; delete it to return pull requests to `full`.
 
 Source-level tests (lint, unit, integration, e2e) already passed on the pull request for the
 same tree, so `release` skips them and re-verifies what gets published: secrets, dependency

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Trusted two-repository writer. Only STAGE updates main; DEV/PROD need review."""
+"""Trusted two-repository writer. STAGE (automatic) and DEV (manual) update main; PROD needs review."""
 import argparse
 from contextlib import contextmanager
 import fcntl
@@ -156,10 +156,11 @@ def promote(environment, sha, digests, release='', app_repo=APPLICATION_REPO,
                 f'{OVERLAYS}/{environment}/kustomization.yaml', f'{OVERLAYS}/{environment}/promotion.json'}
             changed = commit(infra, environment, sha, allowed)
             head = git('rev-parse', 'HEAD', cwd=infra)
-            if environment == 'stage':
-                # Mandatory recheck immediately before EVERY attempted infrastructure push.
-                # Different repositories cannot provide a cross-repository atomic transaction.
-                if current_main(app_repo) != sha:
+            if environment in ('stage', 'dev'):
+                # STAGE follows application main: mandatory recheck immediately before EVERY
+                # attempted push (two repositories cannot share an atomic transaction). DEV is a
+                # deliberate manual deployment of any branch, so it is never superseded.
+                if environment == 'stage' and current_main(app_repo) != sha:
                     return {'status': 'superseded', 'sha': sha, 'digests': digests}
                 if changed and not push_main(infra):
                     continue

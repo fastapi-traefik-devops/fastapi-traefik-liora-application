@@ -119,12 +119,31 @@ class PromotionTests(unittest.TestCase):
             self.assertEqual(push.call_count, 1)
         self.assertEqual(self.head(), self.base)
 
-    def test_dev_is_review_branch_only(self):
+    def test_dev_commits_only_dev_files_directly_and_is_idempotent(self):
         result = self.invoke('dev')
-        self.assertEqual(result['status'], 'review-required')
-        self.assertEqual(self.head(), self.base)
-        self.assertEqual(json.loads(self.show(promote.OVERLAYS + '/dev/promotion.json', result['branch']))['sha'], self.sha)
-        self.assertEqual(self.invoke('dev')['branch'], result['branch'])
+        head = self.head()
+        self.assertEqual((result['status'], result['infrastructure_commit']), ('promoted', head))
+        paths = set(promote.git('--git-dir', str(self.infra), 'diff-tree', '--no-commit-id', '--name-only', '-r', head).splitlines())
+        self.assertEqual(paths, {promote.OVERLAYS + '/dev/kustomization.yaml', promote.OVERLAYS + '/dev/promotion.json'})
+        self.assertEqual(json.loads(self.show(promote.OVERLAYS + '/dev/promotion.json'))['sha'], self.sha)
+        self.invoke('dev')
+        self.assertEqual(head, self.head())
+
+    def test_dev_accepts_a_branch_commit_that_is_not_on_main(self):
+        promote.git('checkout', '-qb', 'feature', cwd=self.aw)
+        (self.aw / 'source').write_text('feature work')
+        promote.git('commit', '-qam', 'Feature', cwd=self.aw)
+        promote.git('push', '-q', 'origin', 'feature', cwd=self.aw)
+        self.sha = promote.git('rev-parse', 'HEAD', cwd=self.aw)
+        self.assertEqual(self.invoke('dev')['status'], 'promoted')
+        with self.assertRaises(RuntimeError):
+            self.invoke('stage')
+
+    def test_dev_never_touches_stage_acceptance(self):
+        self.invoke()
+        stage = self.show(promote.OVERLAYS + '/stage/promotion.json')
+        self.invoke('dev')
+        self.assertEqual(self.show(promote.OVERLAYS + '/stage/promotion.json'), stage)
 
     def test_stage_promotion_without_acceptance_cannot_qualify_prod(self):
         self.invoke()

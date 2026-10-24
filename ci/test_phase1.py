@@ -35,6 +35,16 @@ class ProfileTests(unittest.TestCase):
         self.assertNotIn("gitops", PROFILES["migration"])
         self.assertFalse(RELEASE_GATES <= set(PROFILES["migration"]))
 
+    def test_temporary_pr_profile_skips_only_slow_tests(self):
+        self.assertEqual(set(PROFILES["full"]) - set(PROFILES["pr"]), {"backend-integration", "frontend-tests"})
+        self.assertTrue(RELEASE_GATES <= set(PROFILES["pr"]))
+        self.assertIn("backend-unit", PROFILES["pr"])
+
+    def test_dev_profile_attests_pr_gates_for_publication(self):
+        self.assertEqual(PROFILES["dev"][-1], "attest")
+        self.assertTrue(RELEASE_GATES <= set(PROFILES["dev"]))
+        self.assertNotIn("gitops", PROFILES["dev"])
+
     def test_profiles_only_use_known_steps(self):
         for steps in PROFILES.values():
             self.assertTrue(set(steps) <= {*STEPS, "gitops"})

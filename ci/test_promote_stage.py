@@ -68,3 +68,15 @@ print('promote ' + ' '.join(sys.argv[1:]))
         status, output = self.invoke(source_job='app-ci/PR-1')
         self.assertNotEqual(status, 0)
         self.assertNotIn('validated candidate', output)
+
+    def test_dev_from_dev_build_requires_release_attestation(self):
+        status, output = self.invoke(action='dev', source_job='dev-build')
+        self.assertEqual(status, 0)
+        self.assertIn('validated candidate --mode release', output)
+        self.assertIn('promote dev', output)
+
+    def test_actions_only_accept_their_own_source(self):
+        for action, job in (('dev', 'app-ci/main'), ('stage', 'dev-build'), ('dev', 'migration-ci')):
+            status, output = self.invoke(action=action, source_job=job)
+            self.assertNotEqual(status, 0, (action, job))
+            self.assertNotIn('validated candidate', output)

@@ -37,9 +37,11 @@ class PromotePipelineTests(unittest.TestCase):
         self.assertLess(record, verdict)
         self.assertRegex(locked[verdict:], r"error\('STAGE acceptance failed")
 
-    def test_prod_and_dev_actions_stay_unavailable(self):
+    def test_prod_action_stays_unavailable_and_dev_needs_dev_build(self):
         choices = re.search(r"name: 'ACTION', choices: \[([^\]]*)\]", PIPELINE).group(1)
-        self.assertEqual(choices, "'publish-only', 'stage'")
+        self.assertEqual(choices, "'publish-only', 'stage', 'dev'")
+        self.assertIn("if (params.ACTION == 'dev' && params.SOURCE_JOB != 'dev-build')", PIPELINE)
+        self.assertIn("if (params.ACTION == 'stage' && params.SOURCE_JOB != 'app-ci/main')", PIPELINE)
 
     def test_timeout_covers_the_observation_window(self):
         minutes = int(re.search(r'timeout\(time: (\d+), unit: .MINUTES.\)', PIPELINE).group(1))
@@ -50,7 +52,7 @@ class PromotePipelineTests(unittest.TestCase):
 
 
     def test_main_publishes_only_release_attested_candidates(self):
-        self.assertIn("env.PUBLISH_MODE = params.SOURCE_JOB == 'app-ci/main' ? 'release' : 'functional'", PIPELINE)
+        self.assertIn("env.PUBLISH_MODE = params.SOURCE_JOB == 'migration-ci' ? 'functional' : 'release'", PIPELINE)
         self.assertIn('--mode "$PUBLISH_MODE"', PIPELINE)
         self.assertNotIn('--mode functional', PIPELINE)
         copied = re.search(r"filter: '([^']+)'", PIPELINE).group(1).split(',')

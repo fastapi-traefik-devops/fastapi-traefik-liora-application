@@ -1,0 +1,69 @@
+// Manual DEV deployment of any branch. Job "dev-build": Pipeline script from SCM, this repository,
+// branch */main, script path Jenkinsfile.dev, lightweight checkout ON (so the only recorded Git
+// revision is the branch head checked out below; the publisher verifies it against gates.json).
+// Builds and attests the exact branch head on host-ci without credentials, then asks the trusted
+// publisher to publish the scanned images and commit them to the DEV overlay; Argo CD deploys.
+pipeline {
+    agent { label 'host-ci' }
+    parameters {
+        string(name: 'BRANCH', defaultValue: 'main', description: 'Application branch to build and deploy to DEV')
+    }
+    options {
+        skipDefaultCheckout(true)
+        disableConcurrentBuilds()
+        timeout(time: 90, unit: 'MINUTES')
+        buildDiscarder(logRotator(numToKeepStr: '20', artifactNumToKeepStr: '2'))
+        copyArtifactPermission('/trusted/publish')
+    }
+    stages {
+        stage('Checkout branch head') {
+            steps {
+                script {
+                    if (!(params.BRANCH ==~ /[A-Za-z0-9._\/-]+/) || params.BRANCH.contains('..')) { error('Invalid branch name') }
+                    // The real branch commit (not a merge preview), so DEV runs a SHA that exists on GitHub.
+                    def revision = checkout([$class: 'GitSCM', branches: [[name: "refs/heads/${params.BRANCH}"]],
+                        userRemoteConfigs: [[url: 'https://github.com/fastapi-traefik-devops/fastapi-traefik-liora-application.git']]])
+                    env.IMAGE_SHA = revision.GIT_COMMIT
+                    if (!(env.IMAGE_SHA ==~ /[0-9a-f]{40}/)) { error('Full Git SHA required') }
+                    currentBuild.description = "DEV ${params.BRANCH} @ ${env.IMAGE_SHA.take(12)}"
+                }
+            }
+        }
+        stage('DEV gates') {
+            steps {
+                script {
+                    def gates = sh(returnStdout: true, script: 'python3 ci/phase1.py steps --profile dev').trim().split('\n')
+                    for (gate in gates) { stage(gate) { sh "python3 ci/phase1.py ${gate}" } }
+                }
+            }
+        }
+        stage('Archive attested images') {
+            steps {
+                archiveArtifacts artifacts: '.ci-output/*-ci.tar,.ci-output/gates.json,.ci-output/source-sha.txt', fingerprint: true
+            }
+        }
+        stage('Request trusted DEV deployment') {
+            steps {
+                build job: '/trusted/publish', wait: false, parameters: [
+                    string(name: 'CI_BUILD', value: env.BUILD_NUMBER),
+                    string(name: 'SOURCE_JOB', value: 'dev-build'),
+                    string(name: 'ACTION', value: 'dev')]
+            }
+        }
+    }
+    post {
+        always {
+            script {
+                try {
+                    if (fileExists('.ci-output/backend-unit.xml')) { junit '.ci-output/backend-unit.xml' }
+                } finally {
+                    try { archiveArtifacts artifacts: '.ci-output/*.json,.ci-output/*.xml', allowEmptyArchive: true }
+                    finally {
+                        try { if (fileExists('ci/phase1.py')) { sh 'python3 ci/phase1.py cleanup' } }
+                        finally { deleteDir() }
+                    }
+                }
+            }
+        }
+    }
+}

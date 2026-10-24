@@ -1,6 +1,5 @@
-// K3s STAGE cycle with automatic acceptance. Install from reviewed source after explicit
-// live approval, together with the stage-observer node and matching helper bundles.
-// PROD stays blocked until this acceptance is live-verified.
+// Trusted publisher: STAGE from main CI with automatic acceptance, manual DEV from dev-build.
+// Install from reviewed source together with the matching helper bundle. PROD stays blocked.
 pipeline {
     agent { label 'registry-publisher' }
     options {
@@ -11,8 +10,8 @@ pipeline {
         buildDiscarder(logRotator(numToKeepStr: '30'))
     }
     parameters {
-        choice(name: 'ACTION', choices: ['publish-only', 'stage'], description: 'Initial checkpoint: no DEV/PROD workflow or observer')
-        choice(name: 'SOURCE_JOB', choices: ['app-ci/main', 'migration-ci'], description: 'Allowlisted successful source')
+        choice(name: 'ACTION', choices: ['publish-only', 'stage', 'dev'], description: 'stage: from app-ci/main; dev: from dev-build; no PROD')
+        choice(name: 'SOURCE_JOB', choices: ['app-ci/main', 'dev-build', 'migration-ci'], description: 'Allowlisted successful source')
         string(name: 'CI_BUILD', defaultValue: '', description: 'Exact successful candidate build')
     }
     environment { REGISTRY_NAMESPACE = 'ghcr.io/fastapi-traefik-devops' }
@@ -20,11 +19,14 @@ pipeline {
         stage('Verify source CI status and artifacts') {
             steps {
                 script {
-                    if (!(params.ACTION in ['publish-only', 'stage']) ||
-                        !(params.SOURCE_JOB in ['migration-ci', 'app-ci/main']) ||
+                    if (!(params.ACTION in ['publish-only', 'stage', 'dev']) ||
+                        !(params.SOURCE_JOB in ['migration-ci', 'app-ci/main', 'dev-build']) ||
                         !(params.CI_BUILD ==~ /[1-9][0-9]*/)) { error('Invalid publisher request') }
                     if (params.ACTION == 'stage' && params.SOURCE_JOB != 'app-ci/main') {
                         error('STAGE requires successful application main CI')
+                    }
+                    if (params.ACTION == 'dev' && params.SOURCE_JOB != 'dev-build') {
+                        error('DEV requires a successful dev-build')
                     }
                     def source
                     waitUntil(initialRecurrencePeriod: 5000) {
@@ -36,9 +38,9 @@ pipeline {
                         error('Successful source CI with exact revision required')
                     }
                     env.EXPECTED_SOURCE_SHA = source.revision
-                    // Main must be fully attested (release gates incl. scans); only the manual
-                    // migration checkpoint may publish a functional-only candidate.
-                    env.PUBLISH_MODE = params.SOURCE_JOB == 'app-ci/main' ? 'release' : 'functional'
+                    // Main and DEV builds must be fully attested (release gates incl. scans); only the
+                    // manual migration checkpoint may publish a functional-only candidate.
+                    env.PUBLISH_MODE = params.SOURCE_JOB == 'migration-ci' ? 'functional' : 'release'
                     copyArtifacts projectName: params.SOURCE_JOB, selector: specific(params.CI_BUILD),
                         filter: '.ci-output/*-ci.tar,.ci-output/gates.json,.ci-output/candidate.json,.ci-output/source-sha.txt,.ci-output/*.xml',
                         target: 'artifacts', fingerprintArtifacts: true

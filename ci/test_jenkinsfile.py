@@ -7,8 +7,8 @@ PIPELINE = (Path(__file__).resolve().parents[1] / 'Jenkinsfile').read_text()
 
 
 class JenkinsfileTests(unittest.TestCase):
-    def test_pull_requests_and_nightly_run_full_and_main_runs_release(self):
-        self.assertIn("env.CI_PROFILE = (env.CHANGE_ID || nightly || env.BRANCH_NAME != 'main') ? 'full' : 'release'", PIPELINE)
+    def test_pull_requests_run_pr_nightly_runs_full_and_main_runs_release(self):
+        self.assertIn("env.CI_PROFILE = env.CHANGE_ID ? 'pr' : ((nightly || env.BRANCH_NAME != 'main') ? 'full' : 'release')", PIPELINE)
         self.assertIn('hudson.triggers.TimerTrigger$TimerTriggerCause', PIPELINE)
         self.assertIn('python3 ci/phase1.py steps --profile ${env.CI_PROFILE}', PIPELINE)
         self.assertNotIn('--profile migration', PIPELINE)
@@ -27,6 +27,27 @@ class JenkinsfileTests(unittest.TestCase):
         self.assertEqual(set(archived.split(',')), {'.ci-output/*-ci.tar', '.ci-output/gates.json', '.ci-output/source-sha.txt'})
         self.assertNotIn('export-images', PIPELINE)
 
+
+
+DEV = (Path(__file__).resolve().parents[1] / 'Jenkinsfile.dev').read_text()
+
+
+class DevJenkinsfileTests(unittest.TestCase):
+    def test_builds_the_real_branch_head_with_the_dev_profile(self):
+        self.assertIn("string(name: 'BRANCH', defaultValue: 'main'", DEV)
+        self.assertIn('branches: [[name: "refs/heads/${params.BRANCH}"]]', DEV)
+        self.assertIn("python3 ci/phase1.py steps --profile dev", DEV)
+        self.assertIn("agent { label 'host-ci' }", DEV)
+
+    def test_rejects_unsafe_branch_names(self):
+        self.assertIn("if (!(params.BRANCH ==~ /[A-Za-z0-9._\\/-]+/) || params.BRANCH.contains('..'))", DEV)
+
+    def test_hands_attested_archives_to_the_trusted_dev_action_without_credentials(self):
+        self.assertNotIn('withCredentials', DEV)
+        self.assertIn("'.ci-output/*-ci.tar,.ci-output/gates.json,.ci-output/source-sha.txt'", DEV)
+        self.assertIn("string(name: 'SOURCE_JOB', value: 'dev-build')", DEV)
+        self.assertIn("string(name: 'ACTION', value: 'dev')", DEV)
+        self.assertIn("copyArtifactPermission('/trusted/publish')", DEV)
 
 if __name__ == '__main__':
     unittest.main()
