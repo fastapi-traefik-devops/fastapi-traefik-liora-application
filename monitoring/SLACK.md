@@ -1,3 +1,17 @@
+# Historical kind Slack integration
+
+For the current independent NONPROD and PROD K3s clusters, use the infrastructure
+repository's [Slack alerting runbook](https://github.com/fastapi-traefik-devops/fastapi-traefik-liora-infrastructure/blob/main/docs/operations/SLACK_ALERTING.md).
+It describes cluster-specific channels and Secrets, test isolation with
+`purpose: test`, validation, approval gates and FIRING/RESOLVED evidence.
+
+The configuration and instructions below apply to the historical
+`kind-fastapi-dev` installation. Its single webhook, Argo CD ownership and test
+helper are not rollout inputs for either K3s cluster. In particular, do not use
+`monitoring/test-slack-notification.py` on the K3s Alertmanagers: it lacks the
+cluster and purpose labels required to isolate tests. Do not copy its credentials
+or deploy this legacy monitoring stack into the new clusters.
+
 Slack delivery uses the existing route timing and a single Slack receiver with
 `send_resolved: true`. The pinned kube-prometheus-stack 92.2.0 chart mounts
 `alertmanagerSpec.secrets` at `/etc/alertmanager/secrets/`; `api_url_file` reads
