@@ -176,7 +176,7 @@ class CI:
         if not unit:
             self.database()
             self.container(self.test_image, "bash", "scripts/prestart.sh")
-        selected = ["app/tests/scripts"] if unit else ["app/tests/api", "app/tests/crud"]
+        selected = ["app/tests/scripts"] if unit else ["app/tests/api", "app/tests/crud", "app/tests/integration"]
         args = ["coverage", "run", "--source=app", "--omit=app/tests/*"]
         if not unit:
             args.append("--append")

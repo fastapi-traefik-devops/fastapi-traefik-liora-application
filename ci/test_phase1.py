@@ -56,6 +56,32 @@ class ProfileTests(unittest.TestCase):
         self.assertEqual(tuple(output.split()), PROFILES["release"])
 
 
+class BackendSelectionTests(unittest.TestCase):
+    def setUp(self):
+        self.ci = phase1.CI.__new__(phase1.CI)
+        self.ci.name = "test-selection"
+
+    def test_unit_selection_does_not_require_database(self):
+        with patch.object(self.ci, "database") as database, patch.object(self.ci, "container") as container:
+            self.ci.backend_tests(unit=True)
+        database.assert_not_called()
+        container.assert_called_once()
+        command = container.call_args.args
+        selection = command[command.index("pytest") + 1:command.index("-p")]
+        self.assertEqual(selection, ("app/tests/scripts",))
+
+    def test_integration_selection_prepares_database_and_includes_recovery(self):
+        with patch.object(self.ci, "database") as database, patch.object(self.ci, "container") as container:
+            self.ci.backend_tests(unit=False)
+        database.assert_called_once_with()
+        self.assertEqual(container.call_args_list[0].args,
+                         (self.ci.test_image, "bash", "scripts/prestart.sh"))
+        command = container.call_args_list[1].args
+        selection = command[command.index("pytest") + 1:command.index("-p")]
+        self.assertEqual(selection, ("app/tests/api", "app/tests/crud", "app/tests/integration"))
+        self.assertIn("--append", command)
+
+
 class GitopsGateTests(unittest.TestCase):
     def test_gitops_validates_a_fresh_infrastructure_main_checkout(self):
         calls = []

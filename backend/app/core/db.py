@@ -4,7 +4,9 @@ from app import crud
 from app.core.config import settings
 from app.models import User, UserCreate
 
-engine = create_engine(str(settings.SQLALCHEMY_DATABASE_URI))
+# Replace stale pooled connections after a database restart before using them.
+# Transactions interrupted after checkout still fail and must not be replayed.
+engine = create_engine(str(settings.SQLALCHEMY_DATABASE_URI), pool_pre_ping=True)
 
 
 # make sure all SQLModel models are imported (app.models) before initializing DB
