@@ -35,10 +35,10 @@ class ProfileTests(unittest.TestCase):
         self.assertNotIn("gitops", PROFILES["migration"])
         self.assertFalse(RELEASE_GATES <= set(PROFILES["migration"]))
 
-    def test_temporary_pr_profile_skips_only_slow_tests(self):
-        self.assertEqual(set(PROFILES["full"]) - set(PROFILES["pr"]), {"backend-integration", "frontend-tests"})
-        self.assertTrue(RELEASE_GATES <= set(PROFILES["pr"]))
-        self.assertIn("backend-unit", PROFILES["pr"])
+    def test_pull_requests_run_the_full_suite_again(self):
+        self.assertNotIn("pr", PROFILES)
+        for gate in ("backend-unit", "backend-integration", "frontend-tests"):
+            self.assertIn(gate, PROFILES["full"])
 
     def test_dev_profile_matches_release_without_source_tests(self):
         self.assertEqual(PROFILES["dev"], PROFILES["release"])

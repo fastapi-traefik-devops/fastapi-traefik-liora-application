@@ -7,8 +7,9 @@ PIPELINE = (Path(__file__).resolve().parents[1] / 'Jenkinsfile').read_text()
 
 
 class JenkinsfileTests(unittest.TestCase):
-    def test_pull_requests_run_pr_nightly_runs_full_and_main_runs_release(self):
-        self.assertIn("env.CI_PROFILE = env.CHANGE_ID ? 'pr' : ((nightly || env.BRANCH_NAME != 'main') ? 'full' : 'release')", PIPELINE)
+    def test_pull_requests_and_nightly_run_full_and_main_runs_release(self):
+        self.assertIn("env.CI_PROFILE = (env.CHANGE_ID || nightly || env.BRANCH_NAME != 'main') ? 'full' : 'release'", PIPELINE)
+        self.assertNotIn("'pr'", PIPELINE)
         self.assertIn('hudson.triggers.TimerTrigger$TimerTriggerCause', PIPELINE)
         self.assertIn('python3 ci/phase1.py steps --profile ${env.CI_PROFILE}', PIPELINE)
         self.assertNotIn('--profile migration', PIPELINE)
