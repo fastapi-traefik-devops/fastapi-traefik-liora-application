@@ -98,6 +98,7 @@ class GitopsGateTests(unittest.TestCase):
         self.assertIn(phase1.INFRASTRUCTURE_REPO, clone[0])
         self.assertEqual(validate[0], ("sh", str(Path(root) / "ci/validate.sh")))
         self.assertEqual(str(validate[1]), clone[0][-1])
+        self.assertFalse(any("validate-platform.sh" in str(call) for call, _ in calls))
         self.assertIn("gitops", ci.state["passed"])
 
 
@@ -106,8 +107,8 @@ class AttestTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
-        (self.root / "infra/jenkins-host").mkdir(parents=True)
-        shutil.copy(ROOT / "infra/jenkins-host/images.lock.json", self.root / "infra/jenkins-host/")
+        (self.root / "ci").mkdir(parents=True)
+        shutil.copy(ROOT / "ci/images.lock.json", self.root / "ci/")
         for args in (["init", "-q"], ["-c", "user.name=T", "-c", "user.email=t@example.invalid",
                                       "commit", "-q", "--allow-empty", "-m", "fixture"]):
             subprocess.run(["git", "-C", str(self.root), *args], check=True)

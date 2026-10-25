@@ -85,7 +85,7 @@ class CI:
         self.private.chmod(0o700)
         self.state_file = self.private / "state.json"
         self.state = json.loads(self.state_file.read_text()) if self.state_file.exists() else {"passed": []}
-        self.images = json.loads((self.root / "infra/jenkins-host/images.lock.json").read_text())
+        self.images = json.loads((self.root / "ci/images.lock.json").read_text())
         self.env_file = self.private / "test.env"
         if not self.env_file.exists():
             env = {
@@ -306,7 +306,6 @@ class CI:
             with tempfile.TemporaryDirectory(prefix="phase1-infra-") as infra:
                 run("git", "clone", "--quiet", "--depth", "1", "--branch", "main", INFRASTRUCTURE_REPO, infra)
                 run("sh", str(self.root / "ci/validate.sh"), cwd=Path(infra))
-            run("sh", str(self.root / "ci/validate-platform.sh"), cwd=self.root)
             run("python3", "-B", "-m", "unittest", "discover", "-s", str(self.root / "ci"), "-p", "test_*.py")
         elif name == "attest":
             if not RELEASE_GATES.issubset(self.state["passed"]):
