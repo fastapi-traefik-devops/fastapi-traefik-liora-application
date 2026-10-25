@@ -1,5 +1,0 @@
-# Operator bootstrap: fastapi AppProject intentionally cannot create Namespaces.
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: app-dev

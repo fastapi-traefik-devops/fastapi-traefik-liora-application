@@ -1,4 +1,4 @@
-> Production deployment now uses [Jenkins and Argo CD](../../infra/jenkins-host/README.md).
+> Production deployment now uses [Jenkins and Argo CD](../../ci/README.md).
 > The Compose/subdomain examples below describe local or standalone development;
 > GitOps environments use one origin with `/api` ingress routing.
 

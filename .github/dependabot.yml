@@ -26,7 +26,6 @@ updates:
     directories:
       - /backend
       - /frontend
-      - /infra/jenkins-host
     schedule:
       interval: weekly
     commit-message:

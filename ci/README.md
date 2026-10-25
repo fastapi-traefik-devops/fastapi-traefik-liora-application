@@ -1,6 +1,6 @@
 # CI implementation
 
-See [the operating guide](../infra/jenkins-host/README.md). Scripts in this directory are
+See the [infrastructure operating guide](https://github.com/fastapi-traefik-devops/fastapi-traefik-liora-infrastructure/blob/main/runbooks/17-migrate-jenkins-ci.md). Scripts in this directory are
 executed by Jenkins; only the trusted promotion job receives write credentials.
 
 ## Gate profiles and the main pipeline
@@ -71,3 +71,11 @@ as a candidate. A failure ends that one-shot request, with evidence retained.
 The manual Pipeline generates its result through `python3 ci/phase1.py migration-report`.
 This records incomplete functional steps separately from deferred checks; XML
 collection, archiving and cleanup also run if result generation fails.
+
+## CI ownership
+
+`ci/images.lock.json` pins the application test/build container images. Client
+generation uses the same Node image. Jenkins controller, agents, plugin locks
+and cluster installation are maintained in the infrastructure repository.
+The `gitops` gate validates infrastructure overlays with strict CRD schemas;
+legacy kind and platform copies are not CI inputs.

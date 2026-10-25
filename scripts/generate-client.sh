@@ -19,7 +19,7 @@ if command -v npm >/dev/null 2>&1; then
     npm run generate-client
   )
 else
-  node_image="$(python3 -c 'import json; print(json.load(open("infra/jenkins-host/images.lock.json"))["node:24.21.0-bookworm-slim"])')"
+  node_image="$(python3 -c 'import json; print(json.load(open("ci/images.lock.json"))["node:24.21.0-bookworm-slim"])')"
   docker run --rm --user "$(id -u):$(id -g)" --cap-drop ALL \
     --security-opt no-new-privileges:true --memory 2g --cpus 2 \
     -e HOME=/tmp -e NPM_CONFIG_CACHE=/tmp/npm-cache \
