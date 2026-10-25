@@ -1,6 +1,6 @@
 # CI implementation
 
-See the [infrastructure operating guide](https://github.com/fastapi-traefik-devops/fastapi-traefik-liora-infrastructure/blob/main/runbooks/17-migrate-jenkins-ci.md). Scripts in this directory are
+See the [infrastructure operating guide](https://github.com/fastapi-traefik-devops/fastapi-traefik-liora-infrastructure/blob/main/runbooks/17-install-operate-jenkins.md). Scripts in this directory are
 executed by Jenkins; only the trusted promotion job receives write credentials.
 
 ## Gate profiles and the main pipeline
