@@ -1,5 +1,5 @@
 FROM ghcr.io/astral-sh/uv:0.13.5@sha256:32a7bb39b496babbd997b0a39a4d66c126bdaf5661b302bf6f06abda8deca6ff AS uv
-FROM python:3.13.16-alpine3.24@sha256:2d9aefe2fef018a7eb2c13064c89c71929800fd2e5dccdbf52ea5da5bb8d929a AS builder
+FROM python:3.15.0-alpine3.24@sha256:2699b90f4d562a22e2dd076c82f964032f64814204bff36d271a54ba4cc2c7e2 AS builder
 COPY --from=uv /uv /usr/local/bin/uv
 RUN python -m pip uninstall -y pip && rm -rf /usr/local/lib/python3.13/ensurepip
 ENV UV_LINK_MODE=copy UV_COMPILE_BYTECODE=1
@@ -18,7 +18,7 @@ ENV PATH="/app/.venv/bin:$PATH" PYTHONPATH=/app PYTHONUNBUFFERED=1
 RUN apk add --no-cache bash
 CMD ["pytest"]
 
-FROM python:3.13.16-alpine3.24@sha256:2d9aefe2fef018a7eb2c13064c89c71929800fd2e5dccdbf52ea5da5bb8d929a AS runtime
+FROM python:3.15.0-alpine3.24@sha256:2699b90f4d562a22e2dd076c82f964032f64814204bff36d271a54ba4cc2c7e2 AS runtime
 RUN python -m pip uninstall -y pip && rm -rf /usr/local/lib/python3.13/ensurepip
 RUN apk add --no-cache bash && addgroup -g 10001 app && adduser -D -H -u 10001 -G app app
 WORKDIR /app
