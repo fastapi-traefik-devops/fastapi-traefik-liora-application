@@ -1,6 +1,5 @@
 // CI for the multibranch job app-ci: main and pull requests. Gate profiles live in ci/phase1.py:
-//   pull request                      -> "pr" (TEMPORARY: "full" without integration and e2e tests)
-//   nightly run on main               -> "full" (all 18 gates plus GitOps validation), no publication
+//   pull request, nightly run on main -> "full" (all 18 gates plus GitOps validation), no publication
 //   change on main                    -> "release" (artifact, security and attestation gates), then
 //                                        trusted/publish promotes the attested images to STAGE
 pipeline {
@@ -26,7 +25,7 @@ pipeline {
                     env.IMAGE_SHA = revision.GIT_COMMIT
                     if (!(env.IMAGE_SHA ==~ /[0-9a-f]{40}/)) { error('Full Git SHA required') }
                     def nightly = !currentBuild.getBuildCauses('hudson.triggers.TimerTrigger$TimerTriggerCause').isEmpty()
-                    env.CI_PROFILE = env.CHANGE_ID ? 'pr' : ((nightly || env.BRANCH_NAME != 'main') ? 'full' : 'release')
+                    env.CI_PROFILE = (env.CHANGE_ID || nightly || env.BRANCH_NAME != 'main') ? 'full' : 'release'
                     env.PUBLISH = (env.BRANCH_NAME == 'main' && env.CI_PROFILE == 'release') ? 'true' : 'false'
                     currentBuild.description = "Profile ${env.CI_PROFILE}${nightly ? ' (nightly)' : ''}" +
                         "${env.PUBLISH == 'true' ? ', publishes to STAGE' : ''}"

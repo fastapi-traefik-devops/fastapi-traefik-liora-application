@@ -46,10 +46,6 @@ PROFILES = {
         "frontend-image-security", "attest",
     ),
 }
-# TEMPORARY (2026-10-24): pull requests skip the slow integration and e2e tests to speed up CI
-# setup; the nightly "full" run still executes them. Remove "pr" to return PRs to "full".
-SKIPPED_ON_PR = ("backend-integration", "frontend-tests")
-PROFILES["pr"] = tuple(step for step in PROFILES["full"] if step not in SKIPPED_ON_PR)
 # Manual DEV build of any branch: same gates as a main release (source tests belong to the PR).
 PROFILES["dev"] = PROFILES["release"]
 # The publisher refuses an attestation that lacks any of these.
