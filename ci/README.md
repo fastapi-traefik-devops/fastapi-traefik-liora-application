@@ -19,6 +19,15 @@ Gates are defined once in `phase1.py`; the `Jenkinsfile` picks the profile:
 DEV overlay in infrastructure `main`; Argo CD deploys. DEV is never superseded and has no
 acceptance. The `pr` profile is a temporary speed-up; delete it to return pull requests to `full`.
 
+`backend-unit` selects `backend/app/tests/scripts` without starting PostgreSQL.
+`backend-integration` prepares a disposable PostgreSQL database, runs prestart
+(migrations and initialization), then selects `backend/app/tests/api`,
+`backend/app/tests/crud` and `backend/app/tests/integration`. SQLAlchemy connection
+recovery tests belong to the last folder because they require real PostgreSQL
+connections. They run with the integration gate, which the temporary `pr` profile
+currently skips; this classification does not change gate profiles or triggers.
+See [backend test commands](../backend/README.md#postgresql-connection-recovery).
+
 Source-level tests (lint, unit, integration, e2e) already passed on the pull request for the
 same tree, so `release` skips them and re-verifies what gets published: secrets, dependency
 audits, image builds, non-root smoke tests and Trivy, recorded by `attest` in `gates.json`.
