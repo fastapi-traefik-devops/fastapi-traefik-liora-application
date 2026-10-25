@@ -51,8 +51,9 @@ class MainCycleTests(unittest.TestCase):
         recorded = json.loads(self.fixture.show('kubernetes/apps/liora/overlays/stage/promotion.json'))
         self.assertEqual((recorded['sha'], recorded['digests']), (self.fixture.sha, self.fixture.pair))
         # A desired-state update is not accepted-deployment evidence.
-        with self.assertRaisesRegex(RuntimeError, 'PROD is blocked'):
-            self.fixture.invoke('prod', release='v1.2.0')
+        self.fixture.tag()
+        with self.assertRaisesRegex(RuntimeError, 'requires successful STAGE acceptance'):
+            self.fixture.invoke('prod', future=True, release='v1.2.0')
 
     def test_main_without_security_gates_is_never_published(self):
         self.attest(RELEASE_GATES - {'backend-image-security'})

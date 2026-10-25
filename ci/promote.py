@@ -13,8 +13,9 @@ APPLICATION_REPO = 'https://github.com/fastapi-traefik-devops/fastapi-traefik-li
 INFRASTRUCTURE_REPO = 'https://github.com/fastapi-traefik-devops/fastapi-traefik-liora-infrastructure.git'
 REGISTRY = 'ghcr.io/fastapi-traefik-devops/fastapi-'
 OVERLAYS = 'kubernetes/apps/liora/overlays'
-# Flip only in a reviewed change after the agreed acceptance gate is live-verified.
-PROD_ENABLED = False
+# Enabled after automatic STAGE acceptance was live-verified (2026-10-24). PROD still requires
+# a vX.Y.Z tag on the exact SHA, a matching accepted STAGE receipt and a reviewed infra PR.
+PROD_ENABLED = True
 COMPONENTS = ('backend', 'frontend')
 STAGE_FILES = {f'{OVERLAYS}/stage/{n}' for n in ('kustomization.yaml', 'promotion.json', 'acceptance.json')}
 
@@ -170,11 +171,23 @@ def promote(environment, sha, digests, release='', app_repo=APPLICATION_REPO,
             refs = git('ls-remote', 'origin', f'refs/heads/{branch}', cwd=infra)
             if refs:
                 git('fetch', '--quiet', 'origin', branch, cwd=infra)
+                merged = subprocess.run(['git', 'merge-base', '--is-ancestor', 'FETCH_HEAD', 'origin/main'],
+                                        cwd=infra, capture_output=True).returncode == 0
+                if merged:
+                    # Re-releasing an earlier version (rollback): its branch is already merged, so a
+                    # new review branch based on the current infrastructure main is required.
+                    branch = f'{branch}-redeploy-{git("rev-parse", "--short=7", "origin/main", cwd=infra)}'
+                    refs = git('ls-remote', 'origin', f'refs/heads/{branch}', cwd=infra)
+            if refs:
+                git('fetch', '--quiet', 'origin', branch, cwd=infra)
                 for path in allowed:
                     if git('show', f'FETCH_HEAD:{path}', cwd=infra) != (infra / path).read_text().strip():
                         raise RuntimeError('Existing review branch differs; manual resolution required')
             elif changed:
                 git('push', 'origin', f'HEAD:refs/heads/{branch}', cwd=infra)
+            else:
+                # The environment already runs exactly this pair (e.g. a rollback to the live release).
+                return {'status': 'unchanged', 'sha': sha, 'digests': digests}
             return {'status': 'review-required', 'sha': sha, 'digests': digests,
                     'branch': branch, 'review_url': INFRASTRUCTURE_REPO.removesuffix('.git') + '/compare/main...' + branch}
         raise RuntimeError('Infrastructure main advanced repeatedly; retry manually')
@@ -226,6 +239,8 @@ def main():
     result = promote(args.environment, args.source, digests, args.release)
     Path(args.output).write_text(json.dumps(result, indent=2) + '\n')
     print('Promotion result:', result['status'])
+    if result.get('review_url'):
+        print('Review and merge to deploy:', result['review_url'])
 
 
 if __name__ == '__main__':

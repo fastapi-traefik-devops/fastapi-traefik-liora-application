@@ -8,7 +8,7 @@ import unittest
 
 
 class PublisherActionTests(unittest.TestCase):
-    def invoke(self, action='stage', missing=None, newest='a' * 40, source_job='app-ci/main'):
+    def invoke(self, action='stage', missing=None, newest='a' * 40, source_job='app-ci/main', release=''):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             shutil.copy(Path(__file__).with_name('publisher-action.sh'), root)
@@ -23,7 +23,7 @@ print('promote ' + ' '.join(sys.argv[1:]))
             env = dict(os.environ, PATH=str(root) + ':' + os.environ['PATH'], NEWEST=newest,
                        ACTION=action, EXPECTED_SOURCE_SHA='a' * 40, GHCR_USER='fake',
                        GHCR_TOKEN='fixture-registry-secret', GIT_TOKEN='fixture-git-secret',
-                       SOURCE_JOB=source_job, CI_BUILD='3')
+                       SOURCE_JOB=source_job, CI_BUILD='3', RELEASE_TAG=release)
             if missing: env.pop(missing, None)
             result = subprocess.run(['sh', str(root / 'publisher-action.sh')], cwd=root, env=env, text=True, capture_output=True)
             output = result.stdout + result.stderr
@@ -48,11 +48,17 @@ print('promote ' + ' '.join(sys.argv[1:]))
         self.assertNotIn('validated candidate', output)
         self.assertNotIn('promote stage', output)
 
-    def test_prod_is_blocked_without_publication_or_rebuild(self):
-        status, output = self.invoke(action='prod')
-        self.assertNotEqual(status, 0)
+    def test_prod_requires_a_release_tag(self):
+        for tag in ('', '1.0.0', 'v1.0', 'v01.0.0', 'v1.0.0-rc1'):
+            status, output = self.invoke(action='prod', release=tag)
+            self.assertNotEqual(status, 0, tag)
+            self.assertNotIn('promote prod', output)
+
+    def test_prod_reuses_published_images_without_registry_publication(self):
+        status, output = self.invoke(action='prod', release='v1.0.0')
+        self.assertEqual(status, 0)
         self.assertNotIn('validated candidate', output)
-        self.assertNotIn('promote prod', output)
+        self.assertIn('promote prod ' + 'a' * 40 + ' --release v1.0.0', output)
 
     def test_main_requires_release_attestation(self):
         status, output = self.invoke(source_job='app-ci/main')

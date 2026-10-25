@@ -193,7 +193,52 @@ class PromotionTests(unittest.TestCase):
         files = promote.git('--git-dir', str(self.infra), 'ls-tree', '-r', '--name-only', 'main').splitlines()
         self.assertNotIn(promote.OVERLAYS + '/stage/acceptance.json', files)
 
-    def test_initial_checkpoint_blocks_prod_even_with_accepted_fixture(self):
+    def release(self, content, tag):
+        # One accepted STAGE cycle for a new application SHA, tagged as a release.
+        (self.aw / 'source').write_text(content)
+        self.sha = self.save(self.aw)
+        promote.record_acceptance(self.receipt(self.invoke()), str(self.infra))
+        promote.git('tag', tag, cwd=self.aw)
+        promote.git('push', '-q', 'origin', tag, cwd=self.aw)
+        return self.sha
+
+    def merge(self, branch):
+        promote.git('fetch', '-q', 'origin', cwd=self.iw)
+        promote.git('checkout', '-q', 'main', cwd=self.iw)
+        promote.git('reset', '-q', '--hard', 'origin/main', cwd=self.iw)
+        promote.git('merge', '-q', '--no-ff', '-m', 'Merge ' + branch, 'origin/' + branch, cwd=self.iw)
+        promote.git('push', '-q', 'origin', 'main', cwd=self.iw)
+
+    def prod_sha(self):
+        return json.loads(self.show(promote.OVERLAYS + '/prod/promotion.json'))['sha']
+
+    def test_rollback_re_releases_a_merged_tag_on_a_new_review_branch(self):
+        old = self.release('v1', 'v1.0.0')
+        first = self.invoke('prod', future=True, release='v1.0.0')
+        self.merge(first['branch'])
+        new = self.release('v2', 'v1.0.1')
+        self.merge(self.invoke('prod', future=True, release='v1.0.1')['branch'])
+        self.assertEqual(self.prod_sha(), new)
+        self.sha = old
+        rollback = self.invoke('prod', future=True, release='v1.0.0')
+        self.assertEqual(rollback['status'], 'review-required')
+        self.assertTrue(rollback['branch'].startswith('promotion/prod/v1.0.0-redeploy-'))
+        self.merge(rollback['branch'])
+        self.assertEqual(self.prod_sha(), old)
+
+    def test_releasing_the_live_version_again_is_unchanged(self):
+        self.release('v1', 'v1.0.0')
+        self.merge(self.invoke('prod', future=True, release='v1.0.0')['branch'])
+        self.assertEqual(self.invoke('prod', future=True, release='v1.0.0')['status'], 'unchanged')
+
+    def test_prod_is_enabled_and_still_needs_acceptance(self):
+        self.assertTrue(promote.PROD_ENABLED)
+        self.tag()
+        with self.assertRaisesRegex(RuntimeError, 'requires successful STAGE acceptance'):
+            promote.promote('prod', self.sha, self.pair, release='v1.2.0', app_repo=str(self.app),
+                            infra_repo=str(self.infra), validator=self.validator)
+
+    def test_kill_switch_blocks_prod_even_with_accepted_fixture(self):
         result = self.invoke()
         promote.record_acceptance(self.receipt(result), str(self.infra))
         self.tag()

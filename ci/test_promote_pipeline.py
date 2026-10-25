@@ -37,11 +37,28 @@ class PromotePipelineTests(unittest.TestCase):
         self.assertLess(record, verdict)
         self.assertRegex(locked[verdict:], r"error\('STAGE acceptance failed")
 
-    def test_prod_action_stays_unavailable_and_dev_needs_dev_build(self):
+    def test_each_action_has_its_source_and_prod_is_a_manual_release(self):
         choices = re.search(r"name: 'ACTION', choices: \[([^\]]*)\]", PIPELINE).group(1)
-        self.assertEqual(choices, "'publish-only', 'stage', 'dev'")
+        self.assertEqual(choices, "'publish-only', 'stage', 'dev', 'prod'")
         self.assertIn("if (params.ACTION == 'dev' && params.SOURCE_JOB != 'dev-build')", PIPELINE)
         self.assertIn("if (params.ACTION == 'stage' && params.SOURCE_JOB != 'app-ci/main')", PIPELINE)
+
+    def test_prod_needs_sha_and_tag_and_skips_source_artifacts(self):
+        verify = PIPELINE[PIPELINE.index("stage('Verify source CI status and artifacts')"):PIPELINE.index("stage('Publish, update and accept")]
+        prod = verify[verify.index("if (params.ACTION == 'prod')"):verify.index("return\n")]
+        self.assertIn("params.APP_SHA ==~ /[0-9a-f]{40}/", prod)
+        self.assertIn("params.RELEASE_TAG ==~ /v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)/", prod)
+        self.assertIn("env.EXPECTED_SOURCE_SHA = params.APP_SHA", prod)
+        # The early return comes before any source-build lookup or artifact copy.
+        self.assertLess(verify.index("return\n"), verify.index("copyArtifacts"))
+        self.assertLess(verify.index("return\n"), verify.index("sourceBuild("))
+
+    def test_prod_reports_the_review_branch_and_never_runs_the_observer(self):
+        locked = block(PIPELINE, "lock(resource: 'liora-stage-promotion')")
+        self.assertIn("prod.status != 'review-required' || !prod.review_url", locked)
+        self.assertIn("if (prod.status == 'unchanged')", locked)
+        self.assertIn("node('stage-observer')", locked)
+        self.assertIn("if (params.ACTION == 'stage' && readJSON(file: 'stage-request.json').status == 'promoted')", locked)
 
     def test_timeout_covers_the_observation_window(self):
         minutes = int(re.search(r'timeout\(time: (\d+), unit: .MINUTES.\)', PIPELINE).group(1))

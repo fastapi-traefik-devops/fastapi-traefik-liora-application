@@ -24,8 +24,12 @@ fi
 for required in EXPECTED_SOURCE_SHA GHCR_USER GHCR_TOKEN ACTION; do
     eval "[ -n \"\${$required:-}\" ]" || { echo "$required required" >&2; exit 1; }
 done
-# Each write action has exactly one allowed source; PROD has no publisher action.
-case "$ACTION:${SOURCE_JOB:-}" in publish-only:*|stage:app-ci/main|dev:dev-build) ;; *) exit 1 ;; esac
+# Each write action has exactly one allowed source. PROD builds and publishes nothing: it reuses
+# the exact STAGE-accepted pair, so it needs only a release tag (checked again in promote.py).
+case "$ACTION:${SOURCE_JOB:-}" in publish-only:*|stage:app-ci/main|dev:dev-build|prod:*) ;; *) exit 1 ;; esac
+if [ "$ACTION" = prod ]; then
+    printf '%s' "${RELEASE_TAG:-}" | grep -Eqx 'v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)' || { echo "RELEASE_TAG vX.Y.Z required" >&2; exit 1; }
+fi
 if [ "$ACTION" = stage ]; then
     # Skip obsolete candidates before publication as well as immediately before Git writes.
     latest=$(git ls-remote --exit-code https://github.com/fastapi-traefik-devops/fastapi-traefik-liora-application.git refs/heads/main)
@@ -37,11 +41,13 @@ if [ "$ACTION" = stage ]; then
 fi
 export DOCKER_CONFIG="$credentials/docker"
 mkdir -p "$DOCKER_CONFIG"
-# Registry Python authenticates and removes its own private config for publication.
-# Main and DEV builds are published only with a release attestation (scans included);
-# functional-only candidates are accepted solely from the manual migration checkpoint.
-case "${SOURCE_JOB:-}" in app-ci/main|dev-build) mode=release ;; migration-ci) mode=functional ;; *) exit 1 ;; esac
-python3 "$helpers/registry.py" artifacts/.ci-output --mode "$mode" --source-job "$SOURCE_JOB" --source-build "$CI_BUILD"
+if [ "$ACTION" != prod ]; then
+    # Registry Python authenticates and removes its own private config for publication.
+    # Main and DEV builds are published only with a release attestation (scans included);
+    # functional-only candidates are accepted solely from the manual migration checkpoint.
+    case "${SOURCE_JOB:-}" in app-ci/main|dev-build) mode=release ;; migration-ci) mode=functional ;; *) exit 1 ;; esac
+    python3 "$helpers/registry.py" artifacts/.ci-output --mode "$mode" --source-job "$SOURCE_JOB" --source-build "$CI_BUILD"
+fi
 [ "$ACTION" != publish-only ] || exit 0
 printf '%s' "$GHCR_TOKEN" | crane auth login ghcr.io -u "$GHCR_USER" --password-stdin >/dev/null 2>&1
 python3 "$helpers/promote.py" "$ACTION" "$EXPECTED_SOURCE_SHA" --release "${RELEASE_TAG:-}"

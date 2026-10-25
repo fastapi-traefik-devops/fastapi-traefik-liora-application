@@ -1,5 +1,6 @@
-// Trusted publisher: STAGE from main CI with automatic acceptance, manual DEV from dev-build.
-// Install from reviewed source together with the matching helper bundle. PROD stays blocked.
+// Trusted publisher: STAGE from main CI with automatic acceptance, manual DEV from dev-build,
+// manual PROD release of an exact STAGE-accepted SHA (vX.Y.Z tag, reviewed infra PR, no rebuild).
+// Install from reviewed source together with the matching helper bundle.
 pipeline {
     agent { label 'registry-publisher' }
     options {
@@ -10,15 +11,28 @@ pipeline {
         buildDiscarder(logRotator(numToKeepStr: '30'))
     }
     parameters {
-        choice(name: 'ACTION', choices: ['publish-only', 'stage', 'dev'], description: 'stage: from app-ci/main; dev: from dev-build; no PROD')
-        choice(name: 'SOURCE_JOB', choices: ['app-ci/main', 'dev-build', 'migration-ci'], description: 'Allowlisted successful source')
-        string(name: 'CI_BUILD', defaultValue: '', description: 'Exact successful candidate build')
+        choice(name: 'ACTION', choices: ['publish-only', 'stage', 'dev', 'prod'], description: 'stage: from app-ci/main; dev: from dev-build; prod: APP_SHA + RELEASE_TAG')
+        choice(name: 'SOURCE_JOB', choices: ['app-ci/main', 'dev-build', 'migration-ci'], description: 'Allowlisted successful source (ignored for prod)')
+        string(name: 'CI_BUILD', defaultValue: '', description: 'Exact successful candidate build (ignored for prod)')
+        string(name: 'APP_SHA', defaultValue: '', description: 'prod: full application SHA with an accepted STAGE receipt')
+        string(name: 'RELEASE_TAG', defaultValue: '', description: 'prod: vX.Y.Z tag that points to APP_SHA')
     }
     environment { REGISTRY_NAMESPACE = 'ghcr.io/fastapi-traefik-devops' }
     stages {
         stage('Verify source CI status and artifacts') {
             steps {
                 script {
+                    if (params.ACTION == 'prod') {
+                        // PROD builds and publishes nothing; promote.py verifies the tag, the accepted
+                        // STAGE receipt and the registry digests, then pushes a review branch.
+                        if (!(params.APP_SHA ==~ /[0-9a-f]{40}/) ||
+                            !(params.RELEASE_TAG ==~ /v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)/)) {
+                            error('PROD requires a full APP_SHA and a vX.Y.Z RELEASE_TAG')
+                        }
+                        env.EXPECTED_SOURCE_SHA = params.APP_SHA
+                        currentBuild.description = "PROD ${params.RELEASE_TAG} (${params.APP_SHA.take(12)})"
+                        return
+                    }
                     if (!(params.ACTION in ['publish-only', 'stage', 'dev']) ||
                         !(params.SOURCE_JOB in ['migration-ci', 'app-ci/main', 'dev-build']) ||
                         !(params.CI_BUILD ==~ /[1-9][0-9]*/)) { error('Invalid publisher request') }
@@ -58,6 +72,16 @@ pipeline {
                             usernamePassword(credentialsId: 'gitops-app', usernameVariable: 'GIT_APP_ID', passwordVariable: 'GIT_TOKEN')
                         ]) {
                             sh 'sh /opt/phase1-ci/publisher-action.sh'
+                        }
+                        if (params.ACTION == 'prod') {
+                            def prod = readJSON(file: 'stage-request.json')
+                            if (prod.status == 'unchanged') {
+                                currentBuild.description = "PROD ${params.RELEASE_TAG}: already deployed, nothing to review"
+                                return
+                            }
+                            if (prod.status != 'review-required' || !prod.review_url) { error('PROD review branch was not created') }
+                            currentBuild.description = "PROD ${params.RELEASE_TAG}: review ${prod.review_url}"
+                            echo "Open and merge to deploy PROD: ${prod.review_url}"
                         }
                         // Superseded candidates and publish-only requests have nothing to observe.
                         if (params.ACTION == 'stage' && readJSON(file: 'stage-request.json').status == 'promoted') {
