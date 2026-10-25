@@ -1,4 +1,4 @@
-FROM jenkins/jenkins:2.585-alpine-jdk21@sha256:e00aee28e0233941e1c952062b2c6f47e44447f8f5a74243dd9ac4e7d7298030
+FROM jenkins/jenkins:2.587-alpine-jdk21@sha256:15209e2ad658bdf711f9db0d1e70b58313e24df8dbdf34ed36b0d404b41fc1d1
 USER root
 RUN apk upgrade --no-cache && mkdir -p /opt/phase1-bootstrap && touch /opt/phase1-bootstrap/Jenkinsfile /opt/phase1-bootstrap/Jenkinsfile.publish
 USER jenkins
