@@ -1,239 +1,116 @@
-# Full Stack FastAPI Template
+# Liora
 
-<a href="https://github.com/fastapi/full-stack-fastapi-template/actions?query=workflow%3ATest" target="_blank"><img src="https://github.com/fastapi/full-stack-fastapi-template/workflows/Test/badge.svg" alt="Test"></a>
-<a href="https://coverage-badge.samuelcolvin.workers.dev/redirect/fastapi/full-stack-fastapi-template" target="_blank"><img src="https://coverage-badge.samuelcolvin.workers.dev/fastapi/full-stack-fastapi-template.svg" alt="Coverage"></a>
+Liora is a full-stack web application (FastAPI backend, React frontend, PostgreSQL) with user
+accounts, JWT authentication and item management, delivered through a self-hosted DevSecOps
+pipeline: Jenkins → GHCR → GitOps → Argo CD on two private K3s clusters.
 
-## Technology Stack and Features
+This repository holds the **application**: source code, tests, Dockerfiles and the Jenkins
+pipelines. Clusters, deployment manifests, databases, monitoring and recovery live in the
+[infrastructure repository](https://github.com/fastapi-traefik-devops/fastapi-traefik-liora-infrastructure).
 
-- ⚡ [**FastAPI**](https://fastapi.tiangolo.com) for the Python backend API.
-    - 🧰 [SQLModel](https://sqlmodel.tiangolo.com) for the Python SQL database interactions (ORM).
-    - 🔍 [Pydantic](https://docs.pydantic.dev), used by FastAPI, for the data validation and settings management.
-    - 💾 [PostgreSQL](https://www.postgresql.org) as the SQL database.
-- 🚀 [React](https://react.dev) for the frontend.
-    - 💃 Using TypeScript, hooks, Vite, and other parts of a modern frontend stack.
-    - 🎨 [Chakra UI](https://chakra-ui.com) for the frontend components.
-    - 🤖 An automatically generated frontend client.
-    - 🧪 [Playwright](https://playwright.dev) for End-to-End testing.
-    - 🦇 Dark mode support.
-- 🐋 [Docker Compose](https://www.docker.com) for development and production.
-- 🔒 Secure password hashing by default.
-- 🔑 JWT (JSON Web Token) authentication.
-- 📫 Email based password recovery.
-- ✅ Tests with [Pytest](https://pytest.org).
-- 📞 [Traefik](https://traefik.io) as a reverse proxy / load balancer.
-- 🚢 Deployment instructions using Docker Compose, including how to set up a frontend Traefik proxy to handle automatic HTTPS certificates.
-- 🏭 CI/CD using GitHub Flow, Jenkins, GHCR and Argo CD; see [the CI guide](ci/README.md).
+Based on [full-stack-fastapi-template](https://github.com/fastapi/full-stack-fastapi-template).
 
-### Dashboard Login
+## Environments
 
-[![API docs](img/login.png)](https://github.com/fastapi/full-stack-fastapi-template)
+| Environment | URL | Cluster | How it is deployed |
+| --- | --- | --- | --- |
+| DEV | https://dev.liora.aprt.info | NONPROD K3s | manually, any branch (`dev-build` job) |
+| STAGE | https://stage.liora.aprt.info | NONPROD K3s | automatically on every merge to `main`, with automatic acceptance |
+| PROD | https://liora.aprt.info | PROD K3s | manually, by release tag `vX.Y.Z` through a reviewed infrastructure PR |
+
+## Where to find what
+
+| Topic | Location |
+| --- | --- |
+| Backend development | [backend/README.md](backend/README.md) |
+| Frontend development | [frontend/README.md](frontend/README.md) |
+| Local stack with Docker Compose | [docs/template/development.md](docs/template/development.md) |
+| CI gates and profiles | [ci/README.md](ci/README.md) |
+| Image publication | [ci/PUBLICATION.md](ci/PUBLICATION.md) |
+| PROD release and rollback | [ci/RELEASE.md](ci/RELEASE.md) |
+| CI/CD overview and setup | [infrastructure `docs/CI_CD.md`](https://github.com/fastapi-traefik-devops/fastapi-traefik-liora-infrastructure/blob/main/docs/CI_CD.md) |
+| Cluster installation and operations | [infrastructure README and runbooks](https://github.com/fastapi-traefik-devops/fastapi-traefik-liora-infrastructure/blob/main/README.md) |
+| Deployment manifests | infrastructure `kubernetes/apps/liora/overlays/{dev,stage,prod}` |
+
+## CI/CD in short
+
+```text
+pull request ── app-ci/PR-<n>, profile full (18 gates) ── GitHub status ── merge
+main ────────── app-ci/main, profile release ── trusted publisher ── GHCR + infra commit ── Argo CD ── STAGE ── acceptance.json
+any branch ──── dev-build (manual) ── trusted publisher ── infra commit ── Argo CD ── DEV
+vX.Y.Z tag ──── trusted/publish ACTION=prod (manual) ── infra PR ── review + merge ── Argo CD ── PROD
+nightly ─────── app-ci/main, profile full, no publication
+```
+
+- Jenkins runs on the NONPROD K3s cluster and is reachable only through Tailscale. Builds run
+  in isolated Docker-in-Docker on `host-ci`, which holds no write credentials.
+- Only the trusted `registry-publisher` agent pushes images and commits to the infrastructure
+  repository; it runs commit-pinned helper scripts, never code from a build.
+- Security gates: gitleaks, pip-audit, npm audit, Trivy image scans, non-root image smoke tests
+  and an attestation (`gates.json`) that the publisher requires.
+- Images are tagged with the full commit SHA and deployed by digest. PROD reuses exactly the
+  image pair that STAGE accepted; nothing is rebuilt for a release. Roll back by re-releasing
+  the previous tag.
+
+## Technology stack
+
+- [FastAPI](https://fastapi.tiangolo.com) backend with [SQLModel](https://sqlmodel.tiangolo.com),
+  [Pydantic](https://docs.pydantic.dev) and [PostgreSQL](https://www.postgresql.org)
+  (CloudNativePG on the clusters); Alembic migrations; tests with [Pytest](https://pytest.org).
+- [React](https://react.dev) frontend with TypeScript, Vite, [Chakra UI](https://chakra-ui.com),
+  a generated API client and [Playwright](https://playwright.dev) end-to-end tests.
+- Secure password hashing, JWT authentication, email-based password recovery.
+- Delivery: Jenkins, GitHub Container Registry, Argo CD, K3s, Traefik ingress, cert-manager.
+- Docker Compose for local development only.
+
+## Screenshots
+
+### Login
+
+![Login](img/login.png)
 
 ### Dashboard - Admin
 
-[![API docs](img/dashboard.png)](https://github.com/fastapi/full-stack-fastapi-template)
+![Dashboard](img/dashboard.png)
 
 ### Dashboard - Create User
 
-[![API docs](img/dashboard-create.png)](https://github.com/fastapi/full-stack-fastapi-template)
+![Create user](img/dashboard-create.png)
 
 ### Dashboard - Items
 
-[![API docs](img/dashboard-items.png)](https://github.com/fastapi/full-stack-fastapi-template)
+![Items](img/dashboard-items.png)
 
 ### Dashboard - User Settings
 
-[![API docs](img/dashboard-user-settings.png)](https://github.com/fastapi/full-stack-fastapi-template)
+![User settings](img/dashboard-user-settings.png)
 
 ### Dashboard - Dark Mode
 
-[![API docs](img/dashboard-dark.png)](https://github.com/fastapi/full-stack-fastapi-template)
+![Dark mode](img/dashboard-dark.png)
 
 ### Interactive API Documentation
 
-[![API docs](img/docs.png)](https://github.com/fastapi/full-stack-fastapi-template)
+![API docs](img/docs.png)
 
-## How To Use It
+## Local development
 
-You can **just fork or clone** this repository and use it as is.
-
-✨ It just works. ✨
-
-### How to Use a Private Repository
-
-If you want to have a private repository, GitHub won't allow you to simply fork it as it doesn't allow changing the visibility of forks.
-
-But you can do the following:
-
-- Create a new GitHub repo, for example `my-full-stack`.
-- Clone this repository manually, set the name with the name of the project you want to use, for example `my-full-stack`:
+Start the local stack with Docker Compose; details in
+[docs/template/development.md](docs/template/development.md):
 
 ```bash
-git clone git@github.com:fastapi/full-stack-fastapi-template.git my-full-stack
+docker compose watch
 ```
 
-- Enter into the new directory:
-
-```bash
-cd my-full-stack
-```
-
-- Set the new origin to your new repository, copy it from the GitHub interface, for example:
-
-```bash
-git remote set-url origin git@github.com:octocat/my-full-stack.git
-```
-
-- Add this repo as another "remote" to allow you to get updates later:
-
-```bash
-git remote add upstream git@github.com:fastapi/full-stack-fastapi-template.git
-```
-
-- Push the code to your new repository:
-
-```bash
-git push -u origin master
-```
-
-### Update From the Original Template
-
-After cloning the repository, and after doing changes, you might want to get the latest changes from this original template.
-
-- Make sure you added the original repository as a remote, you can check it with:
-
-```bash
-git remote -v
-
-origin    git@github.com:octocat/my-full-stack.git (fetch)
-origin    git@github.com:octocat/my-full-stack.git (push)
-upstream    git@github.com:fastapi/full-stack-fastapi-template.git (fetch)
-upstream    git@github.com:fastapi/full-stack-fastapi-template.git (push)
-```
-
-- Pull the latest changes without merging:
-
-```bash
-git pull --no-commit upstream master
-```
-
-This will download the latest changes from this template without committing them, that way you can check everything is right before committing.
-
-- If there are conflicts, solve them in your editor.
-
-- Once you are done, commit the changes:
-
-```bash
-git merge --continue
-```
-
-### Configure
-
-You can then update configs in the `.env` files to customize your configurations.
-
-Before deploying it, make sure you change at least the values for:
-
-- `SECRET_KEY`
-- `FIRST_SUPERUSER_PASSWORD`
-- `POSTGRES_PASSWORD`
-
-You can (and should) pass these as environment variables from secrets.
-
-Read the [deployment.md](./docs/template/deployment.md) docs for more details.
-
-### Generate Secret Keys
-
-Some environment variables in the `.env` file have a default value of `changethis`.
-
-You have to change them with a secret key, to generate secret keys you can run the following command:
+The `.env` file holds local development values only. Replace every `changethis` value before
+using the stack anywhere but your own machine, for example with:
 
 ```bash
 python -c "import secrets; print(secrets.token_urlsafe(32))"
 ```
 
-Copy the content and use that as password / secret key. And run that again to generate another secure key.
+Cluster secrets are not taken from `.env`: they are created by the bootstrap procedures of the
+infrastructure repository.
 
-## How To Use It - Alternative With Copier
-
-This repository also supports generating a new project using [Copier](https://copier.readthedocs.io).
-
-It will copy all the files, ask you configuration questions, and update the `.env` files with your answers.
-
-### Install Copier
-
-You can install Copier with:
-
-```bash
-pip install copier
-```
-
-Or better, if you have [`pipx`](https://pipx.pypa.io/), you can run it with:
-
-```bash
-pipx install copier
-```
-
-**Note**: If you have `pipx`, installing copier is optional, you could run it directly.
-
-### Generate a Project With Copier
-
-Decide a name for your new project's directory, you will use it below. For example, `my-awesome-project`.
-
-Go to the directory that will be the parent of your project, and run the command with your project's name:
-
-```bash
-copier copy https://github.com/fastapi/full-stack-fastapi-template my-awesome-project --trust
-```
-
-If you have `pipx` and you didn't install `copier`, you can run it directly:
-
-```bash
-pipx run copier copy https://github.com/fastapi/full-stack-fastapi-template my-awesome-project --trust
-```
-
-**Note** the `--trust` option is necessary to be able to execute a [post-creation script](https://github.com/fastapi/full-stack-fastapi-template/blob/master/.copier/update_dotenv.py) that updates your `.env` files.
-
-### Input Variables
-
-Copier will ask you for some data, you might want to have at hand before generating the project.
-
-But don't worry, you can just update any of that in the `.env` files afterwards.
-
-The input variables, with their default values (some auto generated) are:
-
-- `project_name`: (default: `"FastAPI Project"`) The name of the project, shown to API users (in .env).
-- `stack_name`: (default: `"fastapi-project"`) The name of the stack used for Docker Compose labels and project name (no spaces, no periods) (in .env).
-- `secret_key`: (default: `"changethis"`) The secret key for the project, used for security, stored in .env, you can generate one with the method above.
-- `first_superuser`: (default: `"admin@example.com"`) The email of the first superuser (in .env).
-- `first_superuser_password`: (default: `"changethis"`) The password of the first superuser (in .env).
-- `smtp_host`: (default: "") The SMTP server host to send emails, you can set it later in .env.
-- `smtp_user`: (default: "") The SMTP server user to send emails, you can set it later in .env.
-- `smtp_password`: (default: "") The SMTP server password to send emails, you can set it later in .env.
-- `emails_from_email`: (default: `"info@example.com"`) The email account to send emails from, you can set it later in .env.
-- `postgres_password`: (default: `"changethis"`) The password for the PostgreSQL database, stored in .env, you can generate one with the method above.
-- `sentry_dsn`: (default: "") The DSN for Sentry, if you are using it, you can set it later in .env.
-
-## Backend Development
-
-Backend docs: [backend/README.md](./backend/README.md).
-
-## Frontend Development
-
-Frontend docs: [frontend/README.md](./frontend/README.md).
-
-## Jenkins CI
-
-Jenkins runs on NONPROD K3s. Application builds and tests use isolated DinD;
-a separate trusted publisher publishes immutable images and updates infrastructure
-GitOps overlays. See [CI profiles and artifact contracts](ci/README.md),
-[publication](ci/PUBLICATION.md) and [manual PROD release](ci/RELEASE.md).
-
-## Deployment
-
-The [infrastructure repository](https://github.com/fastapi-traefik-devops/fastapi-traefik-liora-infrastructure)
-owns K3s, Argo CD, deployment manifests, databases, monitoring and recovery.
-Environment manifests are under `kubernetes/apps/liora/overlays/{dev,stage,prod}`
-in that repository. See [deployment procedures](docs/template/deployment.md).
-
-Docker Compose in this repository supports local application development.
-Historical project material remains under `dev-journal/` and
-`docs/template/archive/`; it is not the current deployment procedure.
+Historical project material remains under `dev-journal/` and `docs/template/archive/`; it is
+not the current deployment procedure.

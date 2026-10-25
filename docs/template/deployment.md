@@ -10,7 +10,7 @@ this repository. Infrastructure and GitOps manifests live in the
 
 - [Fresh deployment and operating sequence](https://github.com/fastapi-traefik-devops/fastapi-traefik-liora-infrastructure/blob/main/README.md).
 - [Deploy application manifests](https://github.com/fastapi-traefik-devops/fastapi-traefik-liora-infrastructure/blob/main/runbooks/13-deploy-application-manifests.md).
-- [Jenkins configuration](https://github.com/fastapi-traefik-devops/fastapi-traefik-liora-infrastructure/blob/main/runbooks/17-migrate-jenkins-ci.md).
+- [Jenkins installation and operation](https://github.com/fastapi-traefik-devops/fastapi-traefik-liora-infrastructure/blob/main/runbooks/17-install-operate-jenkins.md).
 - [CI profiles](../../ci/README.md) and [publication](../../ci/PUBLICATION.md).
 - [Manual PROD release and rollback](../../ci/RELEASE.md).
 
