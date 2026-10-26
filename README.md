@@ -1,14 +1,97 @@
-# Liora
+# FastAPI Traefik DevOps Project
 
-Liora is a full-stack web application (FastAPI backend, React frontend, PostgreSQL) with user
-accounts, JWT authentication and item management, delivered through a self-hosted DevSecOps
-pipeline: Jenkins → GHCR → GitOps → Argo CD on two private K3s clusters.
+A full-stack web application (FastAPI backend, React frontend, PostgreSQL) with user accounts,
+JWT authentication and item management, and the DevOps platform our team built around it.
 
 This repository holds the **application**: source code, tests, Dockerfiles and the Jenkins
 pipelines. Clusters, deployment manifests, databases, monitoring and recovery live in the
 [infrastructure repository](https://github.com/fastapi-traefik-devops/fastapi-traefik-liora-infrastructure).
 
-Based on [full-stack-fastapi-template](https://github.com/fastapi/full-stack-fastapi-template).
+## The application
+
+The application code is based on
+[full-stack-fastapi-template](https://github.com/fastapi/full-stack-fastapi-template).
+
+### Application stack
+
+- ⚡ [FastAPI](https://fastapi.tiangolo.com) for the Python backend API.
+    - 🧰 [SQLModel](https://sqlmodel.tiangolo.com) for the SQL database interactions (ORM).
+    - 🔍 [Pydantic](https://docs.pydantic.dev) for data validation and settings management.
+    - 💾 [PostgreSQL](https://www.postgresql.org) as the SQL database, with Alembic migrations.
+- 🚀 [React](https://react.dev) for the frontend.
+    - 💃 TypeScript, hooks, Vite and other parts of a modern frontend stack.
+    - 🎨 [Chakra UI](https://chakra-ui.com) for the frontend components.
+    - 🤖 An automatically generated frontend client.
+    - 🧪 [Playwright](https://playwright.dev) for end-to-end testing.
+    - 🦇 Dark mode support.
+- 🔒 Secure password hashing by default.
+- 🔑 JWT (JSON Web Token) authentication.
+- 📫 Email based password recovery.
+- ✅ Tests with [Pytest](https://pytest.org).
+- 🐋 [Docker Compose](https://www.docker.com) for local development.
+
+### Screenshots
+
+#### Login
+
+![Login](img/login.png)
+
+#### Dashboard - Admin
+
+![Dashboard](img/dashboard.png)
+
+#### Dashboard - Create User
+
+![Create user](img/dashboard-create.png)
+
+#### Dashboard - Items
+
+![Items](img/dashboard-items.png)
+
+#### Dashboard - User Settings
+
+![User settings](img/dashboard-user-settings.png)
+
+#### Dashboard - Dark Mode
+
+![Dark mode](img/dashboard-dark.png)
+
+#### Interactive API Documentation
+
+![API docs](img/docs.png)
+
+## Our work
+
+### Team
+
+**Vitalii TYTSKYI**, **Dionis FRANGU** and **Tatiana ZAINULLINA**.
+
+### Project goal
+
+We started from a bare repository with the application code above and no environments, no
+delivery pipeline and no operations around it. The goal was to run it the way
+a production service is run, and we built the whole platform around the code:
+
+- private virtualised infrastructure and two highly available Kubernetes clusters
+  (NONPROD for DEV and STAGE, PROD separately), provisioned as code;
+- a self-hosted CI/CD and DevSecOps pipeline: tests, security scans, immutable images, GitOps
+  delivery to DEV, STAGE and PROD with automatic acceptance and a reviewed PROD release;
+- PostgreSQL on CloudNativePG (replicated in PROD) with continuous off-site backups and
+  point-in-time recovery;
+- TLS certificates, monitoring, alerting and documented disaster recovery.
+
+### Platform technologies
+
+| Area | Technologies |
+| --- | --- |
+| Virtualisation and provisioning | Proxmox VE 9, Debian 13 cloud-init template, Terraform, Ansible |
+| Kubernetes | K3s (two 3-node clusters, embedded etcd), kube-vip, Kustomize, Helm (pinned charts) |
+| Network and access | HAProxy edge, Traefik ingress, Tailscale private access, Cloudflare DNS |
+| CI and DevSecOps | Jenkins on K3s (Docker-in-Docker agents, JCasC), Gitleaks, pip-audit, npm audit, Trivy, kubeconform |
+| Delivery | GitHub Container Registry, GitOps, Argo CD (one per cluster) |
+| Databases and backups | CloudNativePG, Barman Cloud to Cloudflare R2 (WAL archiving, PITR), K3s etcd snapshots to R2 |
+| Certificates | cert-manager, Let's Encrypt (ACME DNS-01) |
+| Observability | Prometheus, Alertmanager, Grafana, Slack alerts, UptimeRobot |
 
 ## Environments
 
@@ -51,47 +134,6 @@ nightly ─────── app-ci/main, profile full, no publication
 - Images are tagged with the full commit SHA and deployed by digest. PROD reuses exactly the
   image pair that STAGE accepted; nothing is rebuilt for a release. Roll back by re-releasing
   the previous tag.
-
-## Technology stack
-
-- [FastAPI](https://fastapi.tiangolo.com) backend with [SQLModel](https://sqlmodel.tiangolo.com),
-  [Pydantic](https://docs.pydantic.dev) and [PostgreSQL](https://www.postgresql.org)
-  (CloudNativePG on the clusters); Alembic migrations; tests with [Pytest](https://pytest.org).
-- [React](https://react.dev) frontend with TypeScript, Vite, [Chakra UI](https://chakra-ui.com),
-  a generated API client and [Playwright](https://playwright.dev) end-to-end tests.
-- Secure password hashing, JWT authentication, email-based password recovery.
-- Delivery: Jenkins, GitHub Container Registry, Argo CD, K3s, Traefik ingress, cert-manager.
-- Docker Compose for local development only.
-
-## Screenshots
-
-### Login
-
-![Login](img/login.png)
-
-### Dashboard - Admin
-
-![Dashboard](img/dashboard.png)
-
-### Dashboard - Create User
-
-![Create user](img/dashboard-create.png)
-
-### Dashboard - Items
-
-![Items](img/dashboard-items.png)
-
-### Dashboard - User Settings
-
-![User settings](img/dashboard-user-settings.png)
-
-### Dashboard - Dark Mode
-
-![Dark mode](img/dashboard-dark.png)
-
-### Interactive API Documentation
-
-![API docs](img/docs.png)
 
 ## Local development
 
