@@ -1,14 +1,41 @@
-# Liora
+# FastAPI Traefik DevOps Project
 
-Liora is a full-stack web application (FastAPI backend, React frontend, PostgreSQL) with user
-accounts, JWT authentication and item management, delivered through a self-hosted DevSecOps
-pipeline: Jenkins → GHCR → GitOps → Argo CD on two private K3s clusters.
+DevOps course project by **Vitalii TYTSKYI**, **Dionis FRANGU** and **Tatiana ZAINULLINA**.
+
+## Project goal
+
+We started from a bare application repository: the code of a full-stack web application
+(FastAPI backend, React frontend, PostgreSQL; based on
+[full-stack-fastapi-template](https://github.com/fastapi/full-stack-fastapi-template)) with no
+environments, no delivery pipeline and no operations around it. The goal was to run it the way
+a production service is run, and we built the whole platform around the code:
+
+- private virtualised infrastructure and two highly available Kubernetes clusters
+  (NONPROD for DEV and STAGE, PROD separately), provisioned as code;
+- a self-hosted CI/CD and DevSecOps pipeline: tests, security scans, immutable images, GitOps
+  delivery to DEV, STAGE and PROD with automatic acceptance and a reviewed PROD release;
+- PostgreSQL on CloudNativePG (replicated in PROD) with continuous off-site backups and
+  point-in-time recovery;
+- TLS certificates, monitoring, alerting and documented disaster recovery.
 
 This repository holds the **application**: source code, tests, Dockerfiles and the Jenkins
 pipelines. Clusters, deployment manifests, databases, monitoring and recovery live in the
 [infrastructure repository](https://github.com/fastapi-traefik-devops/fastapi-traefik-liora-infrastructure).
 
-Based on [full-stack-fastapi-template](https://github.com/fastapi/full-stack-fastapi-template).
+## Technologies
+
+| Area | Technologies |
+| --- | --- |
+| Application | FastAPI, SQLModel, Pydantic, Alembic, PostgreSQL; React, TypeScript, Vite, Chakra UI; Pytest, Playwright |
+| Virtualisation and provisioning | Proxmox VE 9, Debian 13 cloud-init template, Terraform, Ansible |
+| Kubernetes | K3s (two 3-node clusters, embedded etcd), kube-vip, Kustomize, Helm (pinned charts) |
+| Network and access | HAProxy edge, Traefik ingress, Tailscale private access, Cloudflare DNS |
+| CI and DevSecOps | Jenkins on K3s (Docker-in-Docker agents, JCasC), Gitleaks, pip-audit, npm audit, Trivy, kubeconform |
+| Delivery | GitHub Container Registry, GitOps, Argo CD (one per cluster) |
+| Databases and backups | CloudNativePG, Barman Cloud to Cloudflare R2 (WAL archiving, PITR), K3s etcd snapshots to R2 |
+| Certificates | cert-manager, Let's Encrypt (ACME DNS-01) |
+| Observability | Prometheus, Alertmanager, Grafana, Slack alerts, UptimeRobot |
+| Local development | Docker Compose |
 
 ## Environments
 
@@ -51,17 +78,6 @@ nightly ─────── app-ci/main, profile full, no publication
 - Images are tagged with the full commit SHA and deployed by digest. PROD reuses exactly the
   image pair that STAGE accepted; nothing is rebuilt for a release. Roll back by re-releasing
   the previous tag.
-
-## Technology stack
-
-- [FastAPI](https://fastapi.tiangolo.com) backend with [SQLModel](https://sqlmodel.tiangolo.com),
-  [Pydantic](https://docs.pydantic.dev) and [PostgreSQL](https://www.postgresql.org)
-  (CloudNativePG on the clusters); Alembic migrations; tests with [Pytest](https://pytest.org).
-- [React](https://react.dev) frontend with TypeScript, Vite, [Chakra UI](https://chakra-ui.com),
-  a generated API client and [Playwright](https://playwright.dev) end-to-end tests.
-- Secure password hashing, JWT authentication, email-based password recovery.
-- Delivery: Jenkins, GitHub Container Registry, Argo CD, K3s, Traefik ingress, cert-manager.
-- Docker Compose for local development only.
 
 ## Screenshots
 
